@@ -1,35 +1,44 @@
-import { Sequelize } from 'sequelize';
-import dotenv from 'dotenv';
+const { Pool } = require('pg');
 
-dotenv.config();
 
-const sequelize = new Sequelize(
-  process.env.DB_NAME,
-  process.env.DB_USER,
-  process.env.DB_PASSWORD,
-  {
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    dialect: 'postgres',
-    logging: false,
-    pool: {
-      max: 5,
-      min: 0,
-      acquire: 30000,
-      idle: 10000
-    }
-  }
-);
+const pool = new Pool({
+  host: process.env.DB_HOST || 'localhost',
+  port: process.env.DB_PORT || 5432,
+  database: process.env.DB_NAME || 'skillswap',
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
 
-async function testConnection() {
+const connectDB = async () => {
   try {
-    await sequelize.authenticate();
-    console.log('Database connection has been established successfully.');
-    return true;
+    const client = await pool.connect();
+    console.log('Database connected successfully');
+    client.release();
   } catch (error) {
-    console.error('Unable to connect to the database:', error);
-    return false;
+    console.error('Database connection error:', error.message);
+    throw error;
   }
-}
+};
 
-export default sequelize;
+
+const query = async (text, params) => {
+  const start = Date.now();
+  try {
+    const res = await pool.query(text, params);
+    const duration = Date.now() - start;
+    console.log('Executed query', { text, duration, rows: res.rowCount });
+    return res;
+  } catch (error) {
+    console.error('Query error:', error.message);
+    throw error;
+  }
+};
+
+module.exports = {
+  pool,
+  query,
+  connectDB
+};
